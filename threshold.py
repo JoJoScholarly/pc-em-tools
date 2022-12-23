@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
+
 from multiprocessing.pool import ThreadPool
 import astropy.io.fits as fits
 import numpy as np
@@ -13,7 +14,11 @@ from fitBackground import *
 
 
 def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
-    # Harpsoe et al. (2012) eq. 24
+    """
+    Calculates probability of a given Poisson rate given detector parameters
+    and threshold level using Harpsoe et al. (2012) eq. 24.
+    """
+    # Stage count specific to E2V 201-20
     m = 604
     EMgain = calcEMgain( EMprob, m )
 
@@ -30,10 +35,11 @@ def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
 
 
 def threshold( data, thresh ):
-    # Output:
-    # -1 = saturated
-    # 0 = no detection
-    # 1 = detection (one or more electrons)
+    """
+    Function takes an image and threshold level as input and returns an array
+    with same dimension with values above threshold valued 1 and values below
+    threshold level 0.
+    """
 
     data[ data<=thresh ] = 0
     data[ data>=thresh ] = 1
@@ -98,11 +104,11 @@ def poissonRateParameter1( filepath, thresh=9):
     hdu.writeto(outfile, overwrite=True)
     """
 
-    return -np.log((N-Q) / N )
+    return -np.log((N-Q) / N ), -np.log((N-cosmics)/N)
 
 
 
-def poissonRateParameter2( filepath, thresh=9, ron=4.7, EMprob=0.009576050704909498, p_sCIC=2e-5 ):
+def poissonRateParameter2( filepath, thresh=9, ron=5.4, EMprob=0.0094590175673047, p_sCIC=2.0491e-5, p_pCIC=1.2785e-2 ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -217,6 +223,9 @@ if __name__ == "__main__":
     # Get the rate parameter estimate and variance
     img_E, img_V = poissonRateParameter2( filepath )
 
+    # Sanity check Poisson direct Poisson rate without corrections
+    img_lb, img_CR = poissonRateParameter1( filepath )
+
     """
     # For a sanity check
     img_lb = poissonRateParameter1( filepath )
@@ -226,11 +235,19 @@ if __name__ == "__main__":
     """
 
     # Write to file
-    outfile1 =  filepath + "lambda_E.fits"
-    outfile2 =  filepath + "lambda_Var.fits"
+    outfile1 = filepath + "lambda_E.fits"
+    outfile2 = filepath + "lambda_Var.fits"
+    outfile3 = filepath + "lambda_CR_reject.fits"
+    outfile4 = filepath + "lambda_lb.fits"
 
     hdu1 = fits.PrimaryHDU( img_E )
     hdu1.writeto( outfile1, overwrite=True )
 
     hdu2 = fits.PrimaryHDU( img_V )
     hdu2.writeto( outfile2, overwrite=True )
+
+    hdu3 = fits.PrimaryHDU( img_CR )
+    hdu3.writeto( outfile3, overwrite=True )
+
+    hdu4 = fits.PrimaryHDU( img_lb )
+    hdu4.writeto( outfile4, overwrite=True )

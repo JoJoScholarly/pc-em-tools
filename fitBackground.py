@@ -156,6 +156,14 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, debug=False ):
                     pp=pp, ps=ps, EMprob=EMprob )
     minuit.migrad()
 
+    # Iterate and correct mistakes in initial bias fit
+    N, bias, ron, pp, ps, EMprob = minuit.values[:]
+    centers = centers+bias
+    minuit = Minuit(chi2fit, N=N, mu=0, sigma=readnoise,
+                    pp=pp, ps=ps, EMprob=EMprob )
+    minuit.migrad()
+
+
     # Calculate for printing.
     Ndof = len(centers) - len(minuit.values[:])
     chi2score = minuit.fval
@@ -172,17 +180,42 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, debug=False ):
     print("Bias fitted with mean BIAS={:.2f}".format(bias)+
           " and RON={:.2f}".format(ron) )
 
-    print("p_pCIC={:.5f}, ".format(pp) + "p_sCIC={:.5f} ".format(ps)
+    print("p_pCIC={:.9f}, ".format(pp) + "p_sCIC={:.9f} ".format(ps)
           + "and EMgain={:.2f}".format(calcEMgain(EMprob, 604)) )
     print("Corresponding single stage EM gain probability p_m=", EMprob)
 
     # Produce informative plots if the debug mode was enabled
     if debug:
-        plt.step(centers, counts, where='mid')
-        plt.plot(centers, EMbiasModel(centers, *minuit.values[:]))
-        plt.plot(centers, EMbiasModel(centers, N, bias, ron, pp, 0, EMprob))
-        plt.yscale('log')
-        plt.ylim((100))
+        # Main figure
+        fig = plt.figure(figsize=(6,6))
+        ax1 = fig.subplots(nrows=1, ncols=1, sharex=False, sharey=False,
+                           gridspec_kw={'height_ratios':[1]})
+
+        ax1.errorbar(centers, counts, np.sqrt(counts),
+                     drawstyle='steps-mid', capsize=2, label='Data', alpha=0.5)
+        ax1.plot(centers, EMbiasModel(centers, *minuit.values[:]),
+                 label='Model')
+        ax1.plot(centers, EMbiasModel(centers, N, bias, ron, pp, 0, EMprob),
+                 label='Model, no sCIC')
+        ax1.set_yscale('log')
+        ax1.legend()
+        ax1.set_ylim((1))
+        ax1.set_yticks([100, 1e4, 1e6, 1e8])
+        ax1.tick_params(axis='x', which='both', bottom=False, top=False,
+                        labelbottom=False)
+
+        # Residual plot
+        ax2 = fig.add_axes([0.125, 0.1, 0.775, 0.1])
+        ax2.errorbar(centers,
+                     (counts-EMbiasModel(centers, *minuit.values[:])), np.sqrt(counts),
+                     drawstyle='steps-mid', alpha=0.5)
+        ax2.set_xlabel('Counts (ADU)')
+        #ax2.set_yscale('log')
+        ax2.set_ylim((-200,200))
+
+        # Residual distribution
+        #ax3 = fig.add_axes([0.615, 0.28, 0.25, 0.25])
+
         plt.show()
 
     # Return the fit result N, mu, sigma
@@ -196,15 +229,15 @@ if __name__ == "__main__":
     filename = sys.argv[1]
 
     data = np.loadtxt(filename)
-    data = data[70:2000]
+    data = data[80:3000]
 
     data[:,1] = data[:,1] # Guess a gain
 
     # Stack of 250 2MB images divided into bins
-    filecount = 29
+    filecount = 175
     N = filecount * 1048*1024 / len(data)
     bias = 100
-    ron = 5
+    ron = 5.35
 
     # Fit mean bias level to be removed from the data
     N, bias, ron = fitBias( data, bias=bias, readnoise=ron, debug=False )
@@ -213,12 +246,8 @@ if __name__ == "__main__":
     data[:,1] = ( data[:,1] - bias )
 
     # Take some initial parameters
-    pp = 0.0334
-    ps = 1e-3
-    EMprob = 0.01
-
-    pp = 0.0334
-    ps = 1e-3
+    pp = 0.012
+    ps = 2e-5
     EMprob = 0.01
 
     fitEMBias(data, N, 0, ron, pp, ps, EMprob, debug=True)

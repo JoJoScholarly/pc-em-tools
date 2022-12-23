@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 
+"""
+Utility function to help finding optimum threshold level.
+
+Parameters
+----------
+thresh : float
+    The threshold level to use.
+ron : float
+    Detector readout noise.
+EMprob : float
+    Single EM stage avalanche multiplication probablility.
+"""
+
 import numpy as np
 from sys import argv
 from math import erf
