@@ -13,6 +13,19 @@ from fitBackground import *
 
 
 
+def threshold( data, thresh ):
+    """
+    Function takes an image and threshold level as input and returns an array
+    with same dimension with values above threshold valued 1 and values below
+    threshold level 0.
+    """
+
+    data[ data<=thresh ] = 0
+    data[ data>=thresh ] = 1
+
+    return data
+
+
 def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
     """
     Calculates probability of a given Poisson rate given detector parameters
@@ -32,19 +45,6 @@ def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
              + p_sCIC * S
             )
     return p_lb
-
-
-def threshold( data, thresh ):
-    """
-    Function takes an image and threshold level as input and returns an array
-    with same dimension with values above threshold valued 1 and values below
-    threshold level 0.
-    """
-
-    data[ data<=thresh ] = 0
-    data[ data>=thresh ] = 1
-
-    return data
 
 
 def poissonRateParameter1( filepath, thresh=9):
@@ -91,7 +91,7 @@ def poissonRateParameter1( filepath, thresh=9):
             # Number of frames up
             N += 1
 
-    Q = cosmics + detections
+    Q = detections #+ cosmics
 
     """
     # False positive rate because of ron raising above threshold
@@ -104,7 +104,7 @@ def poissonRateParameter1( filepath, thresh=9):
     hdu.writeto(outfile, overwrite=True)
     """
 
-    return -np.log((N-Q) / N ), -np.log((N-cosmics)/N)
+    return -np.log((N-Q) / N ), cosmics/N
 
 
 
@@ -132,6 +132,7 @@ def poissonRateParameter2( filepath, thresh=9, ron=5.4, EMprob=0.009459017567304
             mask = np.array(cm, dtype=bool)
 
             # Take a region from top of frame with little or no light on it
+            #overscan = data[:,530:590:]
             overscan = data[:,1050:]
             overscan = overscan.reshape(overscan.shape[0]*overscan.shape[1])
 
@@ -141,7 +142,7 @@ def poissonRateParameter2( filepath, thresh=9, ron=5.4, EMprob=0.009459017567304
 
             overscanHist = np.vstack([counts, binsOut[1:]]).T
 
-            Norm, bias, ron = fitBias( overscanHist )
+            Norm, bias, ron = fitBias( overscanHist, debug=False )
 
             thresholdLevel = round(bias + thresh)
 
@@ -155,10 +156,11 @@ def poissonRateParameter2( filepath, thresh=9, ron=5.4, EMprob=0.009459017567304
     print("Frames read in: ", N)
 
     # Take the detection rates and calculate lambda estimate
-    Q_2d = cosmics + detections
+    Q_2d = detections #+ cosmics
     lb_E, lb_V = lbEstVar2d( N, Q_2d, thresh, ron, EMprob, p_sCIC )
+    eff = (N-cosmics)/N
 
-    return lb_E, lb_V
+    return lb_E, lb_V, eff
 
 
 
@@ -221,10 +223,10 @@ if __name__ == "__main__":
     #valMax = float(argv[3])
 
     # Get the rate parameter estimate and variance
-    img_E, img_V = poissonRateParameter2( filepath )
+    img_E, img_V, eff = poissonRateParameter2( filepath, thresh=24 )
 
     # Sanity check Poisson direct Poisson rate without corrections
-    img_lb, img_CR = poissonRateParameter1( filepath )
+    img_lb, img_CR = poissonRateParameter1( filepath, thresh=24 )
 
     """
     # For a sanity check
@@ -237,7 +239,7 @@ if __name__ == "__main__":
     # Write to file
     outfile1 = filepath + "lambda_E.fits"
     outfile2 = filepath + "lambda_Var.fits"
-    outfile3 = filepath + "lambda_CR_reject.fits"
+    outfile3 = filepath + "CR_eff.fits"
     outfile4 = filepath + "lambda_lb.fits"
 
     hdu1 = fits.PrimaryHDU( img_E )
@@ -246,7 +248,7 @@ if __name__ == "__main__":
     hdu2 = fits.PrimaryHDU( img_V )
     hdu2.writeto( outfile2, overwrite=True )
 
-    hdu3 = fits.PrimaryHDU( img_CR )
+    hdu3 = fits.PrimaryHDU( eff )
     hdu3.writeto( outfile3, overwrite=True )
 
     hdu4 = fits.PrimaryHDU( img_lb )

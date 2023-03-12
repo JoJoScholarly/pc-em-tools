@@ -20,8 +20,8 @@ from fitBackground import calcEMgain
 
 thresh = int(argv[1])
 
-ron = 4.7
-EMprob = 0.009576050704909498
+ron = 4.75
+EMprob = 0.009460117381854902
 EMgain = calcEMgain(EMprob, 604)
 
 

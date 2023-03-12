@@ -69,15 +69,20 @@ def apertureSaturated ( xcen, ycen, r ):
 
 
 
-def trailSaturated ( x, y, ymax ):
+def trailSaturated ( x0, y0, ymax ):
     """
     Return list of coordinates included in a CR trail.
     """
     coordinateList = []
 
-    yy = np.arange(y, ymax)
+    yy = np.arange(0, ymax)
+
     for y in yy:
-        coordinateList.append([x, y])
+        # Add the entire next row after CR hit, bit excessive, imporove by model
+        coordinateList.append([x0+1, y])
+        # Add all on the same row after CR hit
+        if y >= y0:
+            coordinateList.append([x0,y])
 
     return coordinateList
 
