@@ -10,10 +10,27 @@ import configparser
 import os
 import sys
 
-sys.path.append(
-    '/home/jojo/Code/misc/')
+class Chi2Regression:
+    # override the class with a better one
+    # Author: Christian Michelsen, NBI, 2018    
+    def __init__(self, f, x, y, sy=None, weights=None, bound=None):
+        
+        if bound is not None:
+            x = np.array(x)
+            y = np.array(y)
+            sy = np.array(sy)
+            mask = (x >= bound[0]) & (x <= bound[1])
+            x  = x[mask]
+            y  = y[mask]
+            sy = sy[mask]
 
-from ExternalFunctions import Chi2Regression
+        self.f = f  # model predicts y for given x
+        self.x = np.array(x)
+        self.y = np.array(y)
+        
+        self.sy = set_var_if_None(sy, self.x)
+        self.weights = set_var_if_None(weights, self.x)
+        self.func_code = make_func_code(describe(self.f)[1:])
 
 
 configFile = "config.ini"
