@@ -11,6 +11,7 @@ import os
 import sys
 
 # This is a test
+# This is line two
 
 class Chi2Regression:
     # override the class with a better one
