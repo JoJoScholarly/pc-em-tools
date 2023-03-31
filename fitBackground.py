@@ -10,6 +10,8 @@ import configparser
 import os
 import sys
 
+# This is a test
+
 class Chi2Regression:
     # override the class with a better one
     # Author: Christian Michelsen, NBI, 2018    
