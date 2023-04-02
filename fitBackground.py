@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+"""Module to fit EMCCD bias frames and deduce detector characteristics.
+Overall organization is to take in a histogram of a series of bias frames, fit
+the histogram with PDF for EM output varying EM gain, CIC and readnoise. PDFs
+are according to Harpsoe et al. (2012) paper Baysian Photon Counting with EMCCDs.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
@@ -9,9 +15,6 @@ from scipy.special import gamma
 import configparser
 import os
 import sys
-
-# This is a test
-# This is line two
 
 class Chi2Regression:
     # override the class with a better one
@@ -36,51 +39,88 @@ class Chi2Regression:
         self.func_code = make_func_code(describe(self.f)[1:])
 
 
+
 configFile = "config.ini"
 config = configparser.ConfigParser()
 config.read( configFile )
 
-"""
-- Take in a stack of bias frames and merge
-- Fit to get the profile for read noise
-- Take the observed bias and 
 
-"""
 
 def gaussian( x, N, mu, sigma ):
-    """
-    Returns a normal distribution for given x-axis.
+    """Returns a normal distribution PDF for the given value range.
+
+    :param x: _description_
+    :type x: _type_
+    :param N: Normalization factor.
+    :type N: float
+    :param mu: Mean of normal the distribution.
+    :type mu: float
+    :param sigma: Standard deviation of the normal distribution.
+    :type sigma: float
+    :return: _description_
+    :rtype: _type_
     """
     return N * norm.pdf(x, mu, sigma)
 
 
+
 def EMsingleStageProbability( EMgain, stageCount ):
-    """
-    Given EM gain and EM amplifier stage count, returns single stage
+    """Given EM gain and EM amplifier stage count, returns single stage
     probability for EM amplification.
+
+    :param EMgain: _description_
+    :type EMgain: float
+    :param stageCount: _description_
+    :type stageCount: int
+    :return: _description_
+    :rtype: float
     """
     return EMgain**(1/stageCount) - 1
 
 
+
 def calcEMgain( singleStageProbability, stageCount ):
-    """
-    Calculates EM gain given single stage electron avalanche probability
+    """Calculates EM gain given single stage electron avalanche probability
     and total stage count.
-    """
+
+    :param singleStageProbability: Probability of cascade amplification event in
+        a single register stage.
+    :type singleStageProbability: float
+    :param stageCount: Number of stages in EM register.
+    :type stageCount: int
+    :return: Returns the total system EM gain.
+    :rtype: float
+    """    
     return ( 1 + singleStageProbability )**stageCount
 
 
+
 def pCICpdf( x, EMgain ):
-    """
-    Probability density function of EM output parallel CIC events.
-    """
+    """Probability density function of EM output parallel CIC events.
+
+    :param x: _description_
+    :type x: _type_
+    :param EMgain: _description_
+    :type EMgain: _type_
+    :return: _description_
+    :rtype: _type_
+    """    
     return np.exp(-x/EMgain) / EMgain * np.heaviside(x, 0)
 
 
+
 def sCICpdf( x, stageCount, singleStageProbability ):
-    """
-    Probability density function of EM output serial CIC events.
-    """
+    """Probability density function of EM output serial CIC events.
+
+    :param x: _description_
+    :type x: _type_
+    :param stageCount: _description_
+    :type stageCount: _type_
+    :param singleStageProbability: _description_
+    :type singleStageProbability: _type_
+    :return: _description_
+    :rtype: _type_
+    """    
     sum = 0
     for i in np.arange(1, stageCount+1):
         gain = calcEMgain( singleStageProbability, i)
@@ -90,9 +130,15 @@ def sCICpdf( x, stageCount, singleStageProbability ):
 
 
 def stackBias( filepath, exten=0 ):
+    """Read in fits files in a directory and median stack. Default fits
+    extension 0.
+
+    :param filepath: Path to the bias file directory to run on 
+    :type filepath: str
+    :param exten: FITS file extension to use, defaults to 0
+    :type exten: int, optional
     """
-    Read in fits files in a directory and median stack. Default fits extension 0.
-    """
+
     biaslist = []
     for filename in os.listdir():
         if filename.endswith(".fits"):
@@ -107,12 +153,29 @@ def stackBias( filepath, exten=0 ):
 
 
 
-def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob ):
-    """
-    Uses Harpsoe et al. 2012 paper eq. 17 to model the EM output. Get the
+def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob, ignoreSerialCIC=False ):
+    """Uses Harpsoe et al. 2012 paper eq. 17 to model the EM output. Get the
     probability of parallel and serial CIC event as an output.
-    """
 
+    :param data: Input histogram values, steps of full ADUs or electronics expected
+    :type data: List[int]
+    :param N: Normal distribution PDF normalization factor.
+    :type N: float
+    :param mu: Normal distribution mean, i.e. bias level.
+    :type mu: float
+    :param sigma: Normal distribution standard deviation, i.e. readnoise.
+    :type sigma: float
+    :param pp: Probability for parallel CIC.
+    :type pp: float
+    :param ps: Probabilty for serial CIC.
+    :type ps: float
+    :param EMprob: EM register single stage probability for impact ionisation.
+    :type EMprob: float
+    :param ignoreSerialCIC: Flag to omit serial CIC.
+    :type ignoreSerialCIC: boolean, optional
+    :return: Calculated EM output.
+    :rtype: List[float]
+    """    
     stageCount = 604
     ignoreSerialCIC = False
 
@@ -135,7 +198,6 @@ def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob ):
                      + ps*sCICpdf( data, stageCount, EMprob)
                         ) * np.heaviside(data, mu)
                      )
-
 
 
 
@@ -266,7 +328,6 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, debug=False ):
 
     # Return the fit result N, mu, sigma
     return minuit.values[:]
-
 
 
 

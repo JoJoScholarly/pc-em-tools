@@ -4,7 +4,7 @@
 This is a collection of scripts that can be used as building blocks for the NTE UV arm spectrograph and Slit Viewer photon counting routines. The initial commit is a dump of a personal project and needs to be refined and generalized in order to be usable in NTE case. The code is based on Harpsoe et al. (2012) "Bayesian Photon Counting with Electron-Multiplying Charge-Coupled Devices". The code is guaranteed to contain bugs in its current state. 
 
 ## Pre-requisites
-Numpy, multi-threading
+Numpy, multi-threading, iMinuit
 
 ## Installation
 Install pre-requisited, clone the repo and run.
@@ -17,10 +17,10 @@ The remaining programs are helpers to get the thresholding setup optimized. The 
 Finally, `findThreshold` can be used for finding the threshold level giving mininum false negative and false positive rate. However, it might be better to use 5-sigma limit for the readnoise as a threshold criteria. The penalty of having too high threshold level is minimal.
 
 ## Authors and acknowledgment
-(c) Joonas Viuho 2022
+(c) Joonas Viuho 2023
 
 ## License
-For open source projects, say how it is licensed.
+Distributed under MIT license.
 
 ## Project status
 An initial commit has been made based on code developed for a personal project. Needs to be made more general, more user-friendly and documented better.
