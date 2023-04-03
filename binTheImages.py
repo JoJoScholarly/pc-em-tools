@@ -11,17 +11,12 @@ from sys import argv
 import matplotlib.pyplot as plt
 
 config = configparser.ConfigParser()
-config.read("config.ini")
+config.read("pc-tools.cfg")
 
 # File info
 filepath = config['files']['path']
-outfile = config['files']['histName']
-exten = config['files']['exten']
-
-# Histogram bin info
-binMin = config['files']['binValMin']
-binMax = config['files']['binValMax'] #2000 #2**14 TODO calculate based on bit depth?
-bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
+outfilename = config['files']['histName']
+exten = int(config['files']['exten'])
 
 # Crop info, TODO needed?
 xbeg = 0
@@ -29,21 +24,26 @@ xend = None
 ybeg = 0
 yend = None
 
-# Initialize variables as nulls
+# Histogram bin info
+binMin = config['files']['binValMin']
+binMax = config['files']['binValMax'] #2000 #2**14 TODO calculate based on bit depth?
+bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
+
+# Init
+filecount = 0
 counts = None
-#bins = None
 
 for filename in os.listdir( filepath ):
     if filename.endswith( ".fits" ):
         with fits.open( filepath + filename ) as hdul:
             data = hdul[exten].data
             data1D = data.reshape( data.shape[0]*data.shape[1] )
-
         if not isinstance(counts, np.ndarray):
             counts, binsOut = np.histogram( data1D, bins=bins )
         else:
             countsToAdd, binsOut = np.histogram( data1D, bins=bins )
             counts += countsToAdd
+        filecount+=1
 
 dataOut = list( zip(counts, bins) )
 
@@ -51,5 +51,6 @@ plt.step(bins[1:], counts, where='mid')
 plt.yscale('log')
 plt.show()
 
-outfile = filepath + outfile
+config['files']['filecount'] = filecount
+outfile = filepath + outfilename
 np.savetxt( outfile, dataOut )
