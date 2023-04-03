@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 
+"""Helper to read a series of bias frames to fit the EM model in order to deduce
+detector EM output characteristics."""
+
 import numpy as np
 import astropy.io.fits as fits
+import configparser
 import os
 from sys import argv
-
 import matplotlib.pyplot as plt
 
-# File info
-filepath = argv[1]
-outfile = argv[2]
-exten = 0
+config = configparser.ConfigParser()
+config.read("config.ini")
 
-# Binning info
-binMin = 0
-binMax = 2000 #2**14 TODO
+# File info
+filepath = config['files']['path']
+outfile = config['files']['histName']
+exten = config['files']['exten']
+
+# Histogram bin info
+binMin = config['files']['binValMin']
+binMax = config['files']['binValMax'] #2000 #2**14 TODO calculate based on bit depth?
 bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
 
-# Crop info
+# Crop info, TODO needed?
 xbeg = 0
 xend = None
 ybeg = 0
