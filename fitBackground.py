@@ -3,7 +3,7 @@
 """Module to fit EMCCD bias frames and deduce detector characteristics.
 Overall organization is to take in a histogram of a series of bias frames, fit
 the histogram with PDF for EM output varying EM gain, CIC and readnoise. PDFs
-are according to Harpsoe et al. (2012) paper Baysian Photon Counting with EMCCDs.
+are according to Harpsoe et al. (2012) paper Bayesian Photon Counting with EMCCDs.
 """
 
 import numpy as np
@@ -15,6 +15,8 @@ from scipy.special import gamma
 import configparser
 import os
 import sys
+
+
 
 class Chi2Regression:
     # override the class with a better one
@@ -37,12 +39,6 @@ class Chi2Regression:
         self.sy = set_var_if_None(sy, self.x)
         self.weights = set_var_if_None(weights, self.x)
         self.func_code = make_func_code(describe(self.f)[1:])
-
-
-
-configFile = "config.ini"
-config = configparser.ConfigParser()
-config.read( configFile )
 
 
 
@@ -201,11 +197,20 @@ def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob, ignoreSerialCIC=False ):
 
 
 
-def fitBias( data, bias=100, readnoise=5, debug=False ):
-    """
-    Fit the bias level with normal distribution.
-    """
+def fitBias( data, bias, readnoise, debug=False ):
+    """Fit bias level with a normal distribution
 
+    :param data: Input data in histogram format, bins starting from 1 to len(data)
+    :type data: List[float]
+    :param bias: Bias level
+    :type bias: int, optional
+    :param readnoise: Readout noise
+    :type readnoise: float, optional
+    :param debug: Flag for additional plotting, defaults to False
+    :type debug: bool, optional
+    :return: Returns fitting parameters for a normal distribution representing the bias level.
+    :rtype: List[float]
+    """    
     counts = data[:,0]
     centers = data[:,1] # bins[:-1] + np.diff(bins)/2
     centers = centers
@@ -244,9 +249,27 @@ def fitBias( data, bias=100, readnoise=5, debug=False ):
 
 
 def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, debug=False ):
-    """
-    Fit full model.
-    """
+    """Fit full EM output model including readnoise, parallel+serial CIC.
+
+    :param data: Input histogram data
+    :type data: List[int]
+    :param N: Normal distribution normalization.
+    :type N: float
+    :param bias: Bias level
+    :type bias: float
+    :param readnoise: Readout noise
+    :type readnoise: float
+    :param pp: Probability for a parallel CIC event.
+    :type pp: float
+    :param ps: Probability for a serial CIC event.
+    :type ps: float
+    :param EMprob: Single register stage EM gain probability.
+    :type EMprob: float
+    :param debug: Flag to produce additional graphical output, defaults to False
+    :type debug: bool, optional
+    :return: Returns fitted parameters.
+    :rtype: List[float]
+    """    
     counts = data[:,0]
     centers = data[:,1]
 
@@ -330,6 +353,12 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, debug=False ):
     return minuit.values[:]
 
 
+# Read config, TODO move to main?
+configFile = "config.ini"
+config = configparser.ConfigParser()
+config.read( configFile )
+
+
 
 if __name__ == "__main__":
 
@@ -342,7 +371,7 @@ if __name__ == "__main__":
 
     # Stack of 250 2MB images divided into bins
     filecount = 175
-    N = filecount * 1048*1024 / len(data)
+    N = filecount * 1048*1024 / len(data) #TODO
     bias = 100
     ron = 5.35
 

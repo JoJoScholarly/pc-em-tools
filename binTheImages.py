@@ -14,7 +14,7 @@ exten = 0
 
 # Binning info
 binMin = 0
-binMax = 2000 #2**14
+binMax = 2000 #2**14 TODO
 bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
 
 # Crop info

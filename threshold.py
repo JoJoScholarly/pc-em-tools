@@ -13,13 +13,19 @@ from fitBackground import *
 
 
 
-def threshold( data, thresh ):
-    """
-    Function takes an image and threshold level as input and returns an array
+def threshold( image, thresh ):
+    """Function takes an image and threshold level as input and returns an array
     with same dimension with values above threshold valued 1 and values below
     threshold level 0.
-    """
 
+    :param iamge: Input image frame
+    :type data: Arr[int]
+    :param thresh: Threshold level
+    :type thresh: int
+    :return: Array with the input image dimensions with 0 if input below 
+    threshold and 1 if above threshold.
+    :rtype: Arr[int]
+    """    
     data[ data<=thresh ] = 0
     data[ data>=thresh ] = 1
 
@@ -27,11 +33,23 @@ def threshold( data, thresh ):
 
 
 def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
-    """
-    Calculates probability of a given Poisson rate given detector parameters
+    """Calculates probability of a given Poisson rate given detector parameters
     and threshold level using Harpsoe et al. (2012) eq. 24.
-    """
-    # Stage count specific to E2V 201-20
+
+    :param lb: _description_
+    :type lb: _type_
+    :param thresh: _description_
+    :type thresh: _type_
+    :param ron: _description_
+    :type ron: _type_
+    :param EMprob: _description_
+    :type EMprob: _type_
+    :param p_sCIC: _description_
+    :type p_sCIC: _type_
+    :return: _description_
+    :rtype: _type_
+    """    
+    # Stage count specific to E2V 201-20, TODO pull from config
     m = 604
     EMgain = calcEMgain( EMprob, m )
 
