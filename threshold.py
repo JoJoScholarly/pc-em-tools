@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from multiprocessing.pool import ThreadPool
 import astropy.io.fits as fits
 import numpy as np
 from sys import argv, exit
