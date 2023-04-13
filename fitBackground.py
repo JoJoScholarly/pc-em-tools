@@ -17,10 +17,25 @@ import os
 import sys
 
 
+from iminuit.util import make_func_code
+from iminuit import describe #, Minuit,
 
-class Chi2Regression:
-    # override the class with a better one
-    # Author: Christian Michelsen, NBI, 2018    
+def set_var_if_None(var, x):
+    if var is not None:
+        return np.array(var)
+    else: 
+        return np.ones_like(x)
+    
+def compute_f(f, x, *par):
+    
+    try:
+        return f(x, *par)
+    except ValueError:
+        return np.array([f(xi, *par) for xi in x])
+
+
+class Chi2Regression:  # override the class with a better one
+        
     def __init__(self, f, x, y, sy=None, weights=None, bound=None):
         
         if bound is not None:
@@ -39,6 +54,16 @@ class Chi2Regression:
         self.sy = set_var_if_None(sy, self.x)
         self.weights = set_var_if_None(weights, self.x)
         self.func_code = make_func_code(describe(self.f)[1:])
+
+    def __call__(self, *par):  # par are a variable number of model parameters
+        
+        # compute the function value
+        f = compute_f(self.f, self.x, *par)
+        
+        # compute the chi2-value
+        chi2 = np.sum(self.weights*(self.y - f)**2/self.sy**2)
+        
+        return chi2
 
 
 
@@ -205,8 +230,8 @@ def fitBias( data, bias, readnoise, plotFig=False ):
     :type bias: int, optional
     :param readnoise: Readout noise
     :type readnoise: float, optional
-    :param debug: Flag for additional plotting, defaults to False
-    :type debug: bool, optional
+    :param plotFig: Flag for additional plotting, defaults to False
+    :type plotFig: bool, optional
     :return: Returns fitting parameters for a normal distribution representing the bias level.
     :rtype: List[float]
     """    
@@ -233,7 +258,7 @@ def fitBias( data, bias, readnoise, plotFig=False ):
     print("Bias fitted with mean BIAS={:.2f}".format(bias)+
           " and RON={:.2f}".format(ron) )
 
-    # Produce plots if the debug mode was enabled
+    # Produce plots if the plotFig mode was enabled
     if plotFig:
         plt.step(centers, counts, where='mid')
         plt.plot(centers, gaussian(centers, *minuit.values[:]))
@@ -264,8 +289,8 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
     :type ps: float
     :param EMprob: Single register stage EM gain probability.
     :type EMprob: float
-    :param debug: Flag to produce additional graphical output, defaults to False
-    :type debug: bool, optional
+    :param plotFig: Flag to produce additional graphical output, defaults to False
+    :type plotFig: bool, optional
     :return: Returns fitted parameters.
     :rtype: List[float]
     """    
@@ -314,7 +339,7 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
           + "and EMgain={:.2f}".format(calcEMgain(EMprob, 604)) )
     print("Corresponding single stage EM gain probability p_m=", EMprob)
 
-    # Produce informative plots if the debug mode was enabled
+    # Produce informative plots if the mode was enabled
     if plotFig:
         # Main figure
         fig = plt.figure(figsize=(6,6))

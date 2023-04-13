@@ -12,7 +12,7 @@ from fitBackground import *
 
 
 
-def threshold( image, thresh ):
+def threshold( data, thresh ):
     """Function takes an image and threshold level as input and returns an array
     with same dimension with values above threshold valued 1 and values below
     threshold level 0.
@@ -64,7 +64,7 @@ def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
     return p_lb
 
 
-def poissonRateParameter1( filepath, thresh=9):
+def poissonRateParameter1( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -97,7 +97,7 @@ def poissonRateParameter1( filepath, thresh=9):
 
             overscanHist = np.vstack([counts, binsOut[1:]]).T
 
-            Norm, bias, ron = fitBias( overscanHist )
+            Norm, bias, ron = fitBias( overscanHist, bias=bias, readnoise=ron, plotFig=False )
 
             thresholdLevel = round(bias + thresh)
 
@@ -125,7 +125,7 @@ def poissonRateParameter1( filepath, thresh=9):
 
 
 
-def poissonRateParameter2( filepath, thresh=9, ron=5.4, EMprob=0.0094590175673047, p_sCIC=2.0491e-5, p_pCIC=1.2785e-2 ):
+def poissonRateParameter2( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -159,7 +159,7 @@ def poissonRateParameter2( filepath, thresh=9, ron=5.4, EMprob=0.009459017567304
 
             overscanHist = np.vstack([counts, binsOut[1:]]).T
 
-            Norm, bias, ron = fitBias( overscanHist, debug=False )
+            Norm, bias, ron = fitBias( overscanHist, bias=bias, readnoise=ron, plotFig=False )
 
             thresholdLevel = round(bias + thresh)
 
@@ -238,12 +238,20 @@ if __name__ == "__main__":
     filepath = argv[1]
     #valMin = float(argv[2])
     #valMax = float(argv[3])
+    
+    thresh = float(config['pc']['threshold'])
+    
+    bias = float(config['detector']['biaslevel'])
+    ron = float(config['detector']['readnoise'])
+    EMprob = float(config['detector']['p_pCIC'])
+    p_sCIC = float(config['detector']['p_sCIC'])
+    p_pCIC = float(config['detector']['p_pCIC'])
 
     # Get the rate parameter estimate and variance
-    img_E, img_V, eff = poissonRateParameter2( filepath, thresh=24 )
+    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
 
     # Sanity check Poisson direct Poisson rate without corrections
-    img_lb, img_CR = poissonRateParameter1( filepath, thresh=24 )
+    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
 
     """
     # For a sanity check
