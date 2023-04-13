@@ -4,7 +4,7 @@
 This is a collection of scripts that can be used as building blocks for the NTE UV arm spectrograph and Slit Viewer photon counting routines. The initial commit is a dump of a personal project and needs to be refined and generalized in order to be usable in NTE case. The code is based on Harpsoe et al. (2012) "Bayesian Photon Counting with Electron-Multiplying Charge-Coupled Devices". The code is guaranteed to contain bugs in its current state. 
 
 ## Pre-requisites
-Numpy, multi-threading, iMinuit
+Numpy, astropy, scipy, iMinuit, matplotlib, configparser, sys, os
 
 ## Installation
 Install pre-requisited, clone the repo and run.
