@@ -10,11 +10,12 @@ import os
 from sys import argv
 import matplotlib.pyplot as plt
 
+configfilename = "pc-tools.cfg"
 config = configparser.ConfigParser()
-config.read("pc-tools.cfg")
+config.read( configfilename )
 
 # File info
-filepath = config['files']['path']
+filepath = argv[1] #config['files']['path']
 outfilename = config['files']['histName']
 exten = int(config['files']['exten'])
 
@@ -25,8 +26,8 @@ ybeg = 0
 yend = None
 
 # Histogram bin info
-binMin = config['files']['binValMin']
-binMax = config['files']['binValMax'] #2000 #2**14 TODO calculate based on bit depth?
+binMin = int(config['files']['binValMin'])
+binMax = int(config['files']['binValMax']) #2000 #2**14 TODO calculate based on bit depth?
 bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
 
 # Init
@@ -51,6 +52,10 @@ plt.step(bins[1:], counts, where='mid')
 plt.yscale('log')
 plt.show()
 
-config['files']['filecount'] = filecount
+config['files']['filecount'] = str(filecount)
+
+with open( configfilename, 'w') as configfile:
+    config.write( configfile )
+
 outfile = filepath + outfilename
 np.savetxt( outfile, dataOut )
