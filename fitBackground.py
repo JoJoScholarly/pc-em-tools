@@ -20,14 +20,15 @@ import sys
 from iminuit.util import make_func_code
 from iminuit import describe #, Minuit,
 
+
 def set_var_if_None(var, x):
     if var is not None:
         return np.array(var)
     else: 
         return np.ones_like(x)
     
+
 def compute_f(f, x, *par):
-    
     try:
         return f(x, *par)
     except ValueError:
@@ -35,9 +36,7 @@ def compute_f(f, x, *par):
 
 
 class Chi2Regression:  # override the class with a better one
-        
     def __init__(self, f, x, y, sy=None, weights=None, bound=None):
-        
         if bound is not None:
             x = np.array(x)
             y = np.array(y)
@@ -56,7 +55,6 @@ class Chi2Regression:  # override the class with a better one
         self.func_code = make_func_code(describe(self.f)[1:])
 
     def __call__(self, *par):  # par are a variable number of model parameters
-        
         # compute the function value
         f = compute_f(self.f, self.x, *par)
         
@@ -174,7 +172,7 @@ def stackBias( filepath, exten=0 ):
 
 
 
-def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob, ignoreSerialCIC=False ):
+def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob ):
     """Uses Harpsoe et al. 2012 paper eq. 17 to model the EM output. Get the
     probability of parallel and serial CIC event as an output.
 
@@ -197,7 +195,8 @@ def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob, ignoreSerialCIC=False ):
     :return: Calculated EM output.
     :rtype: List[float]
     """    
-    stageCount = float(config['detector']['stageCount'])
+    ignoreSerialCIC=False
+    stageCount = 604 # TODO float(config['detector']['stageCount'])
     
     EMgain = calcEMgain( EMprob, stageCount )
 
@@ -237,7 +236,7 @@ def fitBias( data, bias, readnoise, plotFig=False ):
     """    
     counts = data[:,0]
     centers = data[:,1] # bins[:-1] + np.diff(bins)/2
-    centers = centers
+  
     # Remove empty bins for Chi2 fitting
     x = centers[ counts>0 ]
     y = counts[ counts>0 ]
@@ -247,7 +246,7 @@ def fitBias( data, bias, readnoise, plotFig=False ):
     chi2fit = Chi2Regression(gaussian, x, y, sy)
     chi2fit.errordef = 1
 
-    N = np.trapz(counts,centers);
+    N = np.trapz(counts,centers)
 
     # Let iminuit do the fit
     minuit = Minuit(chi2fit, N=N, mu=bias, sigma=readnoise)
@@ -294,6 +293,7 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
     :return: Returns fitted parameters.
     :rtype: List[float]
     """    
+
     counts = data[:,0]
     centers = data[:,1]
 
@@ -377,17 +377,18 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
     return minuit.values[:]
 
 
-# Read config, TODO move to main? TODO if moved stageCount needs passed as argument
-config = configparser.ConfigParser()
-config.read( 'pc-tools.cfg' )
-
-
 
 if __name__ == "__main__":
 
-    filename = config['files']['histName']
-    data = np.loadtxt( filename )
+    # Read config, TODO move to main? TODO if moved stageCount needs passed as argument
+    configfilename = 'pc-tools.cfg'
+    config = configparser.ConfigParser()
+    config.read( configfilename )
 
+    filepath = sys.argv[1]
+    filename = config['files']['histName']
+    data = np.loadtxt( filepath + filename )
+    
     # Clip values making the fits worse
     # TODO necessary or better way to do? Crop overscans out?
     data = data[80:3000] 
@@ -397,20 +398,16 @@ if __name__ == "__main__":
 
     # Stack of 250 2MB images divided into bins
     filecount = int(config['files']['filecount'])
-    xsize = config['detector']['xsize']
-    ysize = config['detector']['ysize']
+    xsize = int(config['detector']['xsize'])
+    ysize = int(config['detector']['ysize'])
     bias = float(config['detector']['biasLevel'])
     ron = float(config['detector']['readnoise'])
 
     # Calculate reasonable starting point for normalization
-    N = filecount * xsize*ysize / len(data)
+    N = filecount * xsize*ysize / data.shape[0]
 
     # Find the mean bias level to be removed from the data
     N, bias, ron = fitBias( data, bias=bias, readnoise=ron, plotFig=False )
-
-    # Update config with new values
-    config['detector']['biasLevel'] = bias
-    config['detector']['biasLevel'] = ron
     
     # Remove mean bias level
     data[:,1] = ( data[:,1] - bias )
@@ -419,5 +416,17 @@ if __name__ == "__main__":
     pp = float(config['detector']['p_pCIC'])
     ps = float(config['detector']['p_sCIC'])
     EMprob = float(config['detector']['p_EM'])
+ 
+    N, bias, ron, pp, ps, EMprob = fitEMBias(data, N, 0, ron, pp, ps, EMprob,
+                                             plotFig=True)
 
-    fitEMBias(data, N, 0, ron, pp, ps, EMprob, plotFig=True)
+    # Update config with new values
+    config['detector']['biaslevel'] = str(bias)
+    config['detector']['readnoise'] = str(ron)
+    config['detector']['p_pcic'] = str(pp)
+    config['detector']['p_scic'] = str(ps)
+    config['detector']['p_em'] = str(EMprob)
+    config['detector']['systemgain'] = str(calcEMgain(EMprob, 604))
+
+    with open( configfilename, 'w') as configfile:
+        config.write( configfile )
