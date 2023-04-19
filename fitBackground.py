@@ -416,12 +416,14 @@ if __name__ == "__main__":
     pp = float(config['detector']['p_pCIC'])
     ps = float(config['detector']['p_sCIC'])
     EMprob = float(config['detector']['p_EM'])
- 
+    
+    # Update bias in config file befire the EM fit, going to be set to 0
+    config['detector']['biaslevel'] = str(bias)
+
     N, bias, ron, pp, ps, EMprob = fitEMBias(data, N, 0, ron, pp, ps, EMprob,
                                              plotFig=True)
 
     # Update config with new values
-    config['detector']['biaslevel'] = str(bias)
     config['detector']['readnoise'] = str(ron)
     config['detector']['p_pcic'] = str(pp)
     config['detector']['p_scic'] = str(ps)
