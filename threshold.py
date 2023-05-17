@@ -134,7 +134,7 @@ def poissonRateParameter2( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
     N = 0
 
     for filename in os.listdir( filepath ):
-        if filename.startswith("SV") and filename.endswith(".fits"):
+        if filename.endswith(".fits"):
             with fits.open( filepath + filename ) as hdul:
                 data = hdul[exten].data
             if N == 0:
@@ -142,7 +142,7 @@ def poissonRateParameter2( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
                 detections = np.zeros(data.shape)
 
             # Each cosmic ray gives negative count, i.e. missed frame
-            cm = maskCosmicEM( data )
+            cm = maskCosmicEM( data, saturationLimit=65536 )
             cosmics += cm
 
             # Each (photo) electron counts as positive, cosmics masked
@@ -238,9 +238,13 @@ if __name__ == "__main__":
     filepath = argv[1]
     #valMin = float(argv[2])
     #valMax = float(argv[3])
-    
+
+    configfilename = "pc-tools.cfg"
+    config = configparser.ConfigParser()
+    config.read( configfilename )
+
     thresh = float(config['pc']['threshold'])
-    
+
     bias = float(config['detector']['biaslevel'])
     ron = float(config['detector']['readnoise'])
     EMprob = float(config['detector']['p_pCIC'])

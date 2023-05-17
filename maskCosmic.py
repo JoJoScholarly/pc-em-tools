@@ -5,7 +5,7 @@ from astropy.io import fits
 from sys import argv
 
 
-def maskCosmicEM ( image, saturationLimit=16000, r=2 ):
+def maskCosmicEM ( image, saturationLimit=65536, r=2 ):
     """Mask the pixels affected by cosmic ray hits. With high EM gain CR hits 
     saturate the severely and the CR hit will leave a trail visible in the 
     readout direction. For each saturated pixel every pixels within radius of 5px
