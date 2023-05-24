@@ -78,7 +78,7 @@ def p_lb( lb, thresh, ron, p_EM, stageCount, p_sCIC ):
     return p_lb
 
 
-def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC ):
+def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -95,7 +95,7 @@ def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC ):
                 detections = np.zeros(data.shape)
 
             # Each cosmic ray gives negative count, i.e. missed frame
-            cm = maskCosmicEM( data )
+            cm = maskCosmicEM( data, crLimit )
             cosmics += cm
 
             # Each (photo) electron counts as positive, cosmics masked
@@ -130,7 +130,7 @@ def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC ):
 
 
 
-def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC ):
+def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -147,7 +147,7 @@ def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC ):
                 detections = np.zeros(data.shape)
 
             # Each cosmic ray gives negative count, i.e. missed frame
-            cm = maskCosmicEM( data, saturationLimit=65536 )
+            cm = maskCosmicEM( data, crLimit )
             cosmics += cm
 
             # Each (photo) electron counts as positive, cosmics masked
@@ -253,13 +253,14 @@ if __name__ == "__main__":
     p_EM = float(config['detector']['p_em'])
     p_sCIC = float(config['detector']['p_sCIC'])
     p_pCIC = float(config['detector']['p_pCIC'])
-    stageCount = float(config['detector']['stagecount'])
+    stageCount = int(config['detector']['stagecount'])
+    crLimit = float(config['pc']['crlimit'])
 
     # Get the rate parameter estimate and variance
-    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC )
+    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit )
 
     # Sanity check Poisson direct Poisson rate without corrections
-    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC )
+    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit )
 
     """
     # For a sanity check
