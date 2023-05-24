@@ -1,35 +1,56 @@
 #!/usr/bin/env python3
-
-"""
-Utility function to help finding optimum threshold level.
-
-Parameters
-----------
-thresh : float
-    The threshold level to use.
-ron : float
-    Detector readout noise.
-EMprob : float
-    Single EM stage avalanche multiplication probablility.
-"""
-
 import numpy as np
 from sys import argv
 from math import erf
 from fitBackground import calcEMgain
 
-thresh = int(argv[1])
 
-ron = 4.75
-EMprob = 0.009460117381854902
-EMgain = calcEMgain(EMprob, 604)
+def falsePositive( thresh, ron ):
+    """Probability that EON raises above threshold.
+
+    Harpsoe et al. (2012) Eq. 20
+
+    :param thresh: treshold level
+    :type thresh: int
+    :param EMgain: EM gain
+    :type EMgain: float
+    :return: Probability that RON raises above threshold.
+    :rtype: float
+    """    
+    return 0.5 - 0.5*erf(thresh/ron/2**0.5)
 
 
-# Probability that RON raises above threshold (false positive)
-p_fp = 0.5 - 0.5*erf(thresh/ron/2**0.5)
+def falseNegative( thresh, EMgain )
+    """Probability that signal does not get amplified over threshold level.
 
-# Probabilty of not to get EM amplified (false negative)
-p_fn = 1 - np.e**(-thresh/EMgain)
+    Harpsoe et al. (2012) Eq. 23
 
-print("False positive rate: {:.1f}".format(p_fp*100)+"%")
-print("False negative rate: {:.1f}".format(p_fn*100)+"%")
+    :param thresh: treshold level
+    :type thresh: int
+    :param EMgain: EM gain
+    :type EMgain: float
+    :return: Probability that signal does not raises above threshold.
+    :rtype: float
+    """    
+    return 1 - np.e**(-thresh/EMgain)
+
+
+if __name__ == "__main__":
+    filepath = argv[1]
+
+    configfilename = "pc-tools.cfg"
+    config = configparser.ConfigParser()
+    config.read( configfilename )
+
+    thresh = float(config['pc']['threshold'])
+    ron = float(config['detector']['readnoise'])
+    p_EM = float(config['detector']['p_em'])
+    stageCount = float(config['detector']['stagecount'])
+
+    EMgain = calcEMgain(p_EM, stageCount)
+    
+    p_fp = falsePositive( thresh, ron )
+    p_fn = falseNegative( thresh, EMgain )
+
+    print("False positive rate: {:.1f}".format(p_fp*100)+"%")
+    print("False negative rate: {:.1f}".format(p_fn*100)+"%")
