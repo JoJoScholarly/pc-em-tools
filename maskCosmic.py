@@ -5,7 +5,7 @@ from astropy.io import fits
 from sys import argv
 
 
-def maskCosmicEM ( image, saturationLimit=65536, r=2 ):
+def maskCosmicEM ( image, crLimit, r=2 ):
     """Mask the pixels affected by cosmic ray hits. With high EM gain CR hits 
     saturate the severely and the CR hit will leave a trail visible in the 
     readout direction. For each saturated pixel every pixels within radius of 5px
@@ -18,8 +18,8 @@ def maskCosmicEM ( image, saturationLimit=65536, r=2 ):
 
     :param image: Input image to be masked
     :type image: Arr[int]
-    :param saturationLimit: Detector saturation limit, defaults to 16000
-    :type saturationLimit: int, optional
+    :param crLimit: Detector saturation limit, defaults to 16000
+    :type crLimit: int, optional
     :param r: Rejection radius around a cosmic ray hit, defaults to 2
     :type r: int, optional
     :return: Returns a mask with the same dimensions as the input image
@@ -28,7 +28,7 @@ def maskCosmicEM ( image, saturationLimit=65536, r=2 ):
     xmax, ymax = image.shape
     mask = np.zeros(image.shape)
 
-    saturated = locateSaturated( image, saturationLimit )
+    saturated = locateSaturated( image, crLimit )
 
     for coord in saturated:
         for apertureCoord in apertureSaturated( coord[0], coord[1], r ):
@@ -46,18 +46,18 @@ def maskCosmicEM ( image, saturationLimit=65536, r=2 ):
 
 
 
-def locateSaturated (image, saturationLimit ):
+def locateSaturated (image, crLimit ):
     """Detect saturated pixels above the saturation limit, to be used as a 
     starting point for masking.
 
     :param image: Image to be masked
     :type image: Arr[int]
-    :param saturationLimit: Detector saturation limit, used as a threshold.
-    :type saturationLimit: int
+    :param crLimit: Detector saturation limit, used as a threshold.
+    :type crLimit: int
     :return: List of tuples indicating coordinates of saturated pixels.
     :rtype: List[float]
     """    
-    cr = np.where( image >= saturationLimit )
+    cr = np.where( image >= crLimit )
     coordinateList = list(zip(*cr))
 
     # NB! Returns list of tuples unlike all the other functions which return
@@ -130,10 +130,16 @@ if __name__ == "__main__":
     filenamebase = filename.split(".")[0]
     exten = 0
 
+    configfilename = "pc-tools.cfg"
+    config = configparser.ConfigParser()
+    config.read( configfilename )
+
+    crLimit = float(config['pc']['crlimit'])
+
     with fits.open(filename) as hdul:
         data = hdul[0].data
 
-    mask = maskCosmicEM(data)
+    mask = maskCosmicEM(data, crLimit )
     outfilename = filenamebase + "_cr_mask.fits"
     hdu = fits.PrimaryHDU( mask )
     hdu.writeto( outfilename, overwrite=True)
