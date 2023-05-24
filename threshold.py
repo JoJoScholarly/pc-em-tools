@@ -10,6 +10,21 @@ import os
 from maskCosmic import *
 from fitBackground import *
 
+configfilename = "pc-tools.cfg"
+config = configparser.ConfigParser()
+config.read( configfilename )
+
+thresh = float(config['pc']['threshold'])
+
+binMin = float(config['files']['binvalmin'])
+binMax = float(config['files']['binvalmax'])
+
+bias = float(config['detector']['biaslevel'])
+ron = float(config['detector']['readnoise'])
+p_EM = float(config['detector']['p_em'])
+p_sCIC = float(config['detector']['p_sCIC'])
+p_pCIC = float(config['detector']['p_pCIC'])
+stageCount = float(config['detector']['stagecount'])
 
 
 def threshold( data, thresh ):
@@ -31,7 +46,7 @@ def threshold( data, thresh ):
     return data
 
 
-def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
+def p_lb( lb, thresh, ron, p_EM, stageCount, p_sCIC ):
     """Calculates probability of a given Poisson rate given detector parameters
     and threshold level using Harpsoe et al. (2012) eq. 24.
 
@@ -41,20 +56,19 @@ def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
     :type thresh: _type_
     :param ron: _description_
     :type ron: _type_
-    :param EMprob: _description_
-    :type EMprob: _type_
+    :param p_EM: _description_
+    :type p_EM: _type_
     :param p_sCIC: _description_
     :type p_sCIC: _type_
     :return: _description_
     :rtype: _type_
     """    
-    # Stage count specific to E2V 201-20, TODO pull from config
-    m = 604
-    EMgain = calcEMgain( EMprob, m )
+    m = stageCount
+    EMgain = calcEMgain( p_EM, m )
 
     S = 0
     for k in range(1, m):
-        EMgain_k = calcEMgain( EMprob, k )
+        EMgain_k = calcEMgain( p_EM, k )
         S += (1 - np.e**(-thresh/EMgain_k))*np.e**(-lb)
 
     p_lb = ( np.e**(-thresh/EMgain)*( 1 - np.e**(-lb))
@@ -64,7 +78,7 @@ def p_lb( lb, thresh, ron, EMprob, p_sCIC ):
     return p_lb
 
 
-def poissonRateParameter1( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC ):
+def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -87,6 +101,7 @@ def poissonRateParameter1( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
             # Each (photo) electron counts as positive, cosmics masked
             mask = np.array(cm, dtype=bool)
 
+            # TODO not universal
             # Take a region from top of frame with little or no light on it
             overscan = data[:,1050:]
             overscan = overscan.reshape(overscan.shape[0]*overscan.shape[1])
@@ -99,6 +114,7 @@ def poissonRateParameter1( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
 
             Norm, bias, ron = fitBias( overscanHist, bias=bias, readnoise=ron, plotFig=False )
 
+            # Round fitted bias level to closest integer value
             thresholdLevel = round(bias + thresh)
 
             aboveThreshold = threshold( data, thresh=thresholdLevel )
@@ -110,22 +126,11 @@ def poissonRateParameter1( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
 
     Q = detections #+ cosmics
 
-    """
-    # False positive rate because of ron raising above threshold
-    # Harpsoe et al. (2012)
-    lb_fp = N*(1 - erf(thresh/ron/2**0.5))/2/(N-Q)
-    hdu = fits.PrimaryHDU(lb_fp)
-
-    # Write out to file
-    outfile = filepath + "falsePosRate.fits"
-    hdu.writeto(outfile, overwrite=True)
-    """
-
     return -np.log((N-Q) / N ), cosmics/N
 
 
 
-def poissonRateParameter2( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC ):
+def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -174,26 +179,26 @@ def poissonRateParameter2( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
 
     # Take the detection rates and calculate lambda estimate
     Q_2d = detections #+ cosmics
-    lb_E, lb_V = lbEstVar2d( N, Q_2d, thresh, ron, EMprob, p_sCIC )
+    lb_E, lb_V = lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC )
     eff = (N-cosmics)/N
 
     return lb_E, lb_V, eff
 
 
 
-def lbEstVar2d( N, Q_2d, thresh, ron, EMprob, p_sCIC ):
+def lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC ):
     # 1. Calculate all the possible values for E and V
     #    (N possibilities, less than calculating s)
-    # 2. Look up for pixel values from 
+    # 2. Look up for pixel value from the LUTs
 
     # Initialize look-up tabels
     lutE = []; lutV = []
 
     print("Calculating possible values for E(lb) and Var(lb)")
 
-    # Calculate possible values for E(lb) and Var(lb)
+    # Calculate all possible values for E(lb) and Var(lb) given the frame count
     for Q in np.arange(N+1):
-        E, V = lbEstVar( N, Q, thresh, ron, EMprob, p_sCIC )
+        E, V = lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC )
         lutE.append(E)
         lutV.append(V)
 
@@ -216,7 +221,7 @@ def lbEstVar2d( N, Q_2d, thresh, ron, EMprob, p_sCIC ):
 
 
 
-def lbEstVar( N, Q, thresh, ron, EMprob, p_sCIC ):
+def lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC ):
     E = 0
     V = 0
 
@@ -225,7 +230,7 @@ def lbEstVar( N, Q, thresh, ron, EMprob, p_sCIC ):
     for q in range(0, Q):
         lb_q = -np.log((N-q) / N )
 
-        p = p_lb(lb_q, thresh, ron, EMprob, p_sCIC)
+        p = p_lb(lb_q, thresh, ron, p_EM, stageCount, p_sCIC)
         a = binom.pmf( q, N, p )
 
         E += lb_q * a
@@ -236,8 +241,6 @@ def lbEstVar( N, Q, thresh, ron, EMprob, p_sCIC ):
 
 if __name__ == "__main__":
     filepath = argv[1]
-    #valMin = float(argv[2])
-    #valMax = float(argv[3])
 
     configfilename = "pc-tools.cfg"
     config = configparser.ConfigParser()
@@ -247,15 +250,16 @@ if __name__ == "__main__":
 
     bias = float(config['detector']['biaslevel'])
     ron = float(config['detector']['readnoise'])
-    EMprob = float(config['detector']['p_pCIC'])
+    p_EM = float(config['detector']['p_em'])
     p_sCIC = float(config['detector']['p_sCIC'])
     p_pCIC = float(config['detector']['p_pCIC'])
+    stageCount = float(config['detector']['stagecount'])
 
     # Get the rate parameter estimate and variance
-    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
+    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC )
 
     # Sanity check Poisson direct Poisson rate without corrections
-    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, EMprob, p_sCIC, p_pCIC )
+    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC )
 
     """
     # For a sanity check
