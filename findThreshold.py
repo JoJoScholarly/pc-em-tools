@@ -2,6 +2,7 @@
 import numpy as np
 from sys import argv
 from math import erf
+import configparser
 from fitBackground import calcEMgain
 
 
@@ -20,7 +21,7 @@ def falsePositive( thresh, ron ):
     return 0.5 - 0.5*erf(thresh/ron/2**0.5)
 
 
-def falseNegative( thresh, EMgain )
+def falseNegative( thresh, EMgain ):
     """Probability that signal does not get amplified over threshold level.
 
     Harpsoe et al. (2012) Eq. 23
@@ -36,7 +37,7 @@ def falseNegative( thresh, EMgain )
 
 
 if __name__ == "__main__":
-    filepath = argv[1]
+    import configparser
 
     configfilename = "pc-tools.cfg"
     config = configparser.ConfigParser()

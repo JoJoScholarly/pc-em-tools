@@ -6,6 +6,7 @@ from sys import argv, exit
 from math import erf
 from scipy.stats import binom
 import os
+import configparser
 
 from maskCosmic import *
 from fitBackground import *

@@ -21,7 +21,10 @@ from iminuit.util import make_func_code
 from iminuit import describe #, Minuit,
 
 # TODO best way?
-global stageCount = int(config['detector']['stagecount'])
+configfilename = 'pc-tools.cfg'
+config = configparser.ConfigParser()
+config.read( configfilename )
+stageCount = int(config['detector']['stagecount'])
 
 def set_var_if_None(var, x):
     if var is not None:
