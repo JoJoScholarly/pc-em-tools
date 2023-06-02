@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Helper to read a series of bias frames to fit the EM model in order to deduce
 detector EM output characteristics."""

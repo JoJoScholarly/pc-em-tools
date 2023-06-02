@@ -20,6 +20,11 @@ import sys
 from iminuit.util import make_func_code
 from iminuit import describe #, Minuit,
 
+# TODO best way?
+configfilename = 'pc-tools.cfg'
+config = configparser.ConfigParser()
+config.read( configfilename )
+stageCount = int(config['detector']['stagecount'])
 
 def set_var_if_None(var, x):
     if var is not None:
@@ -148,31 +153,7 @@ def sCICpdf( x, stageCount, singleStageProbability ):
 
 
 
-def stackBias( filepath, exten=0 ):
-    """Read in fits files in a directory and median stack. Default fits
-    extension 0.
-
-    :param filepath: Path to the bias file directory to run on 
-    :type filepath: str
-    :param exten: FITS file extension to use, defaults to 0
-    :type exten: int, optional
-    """
-
-    biaslist = []
-    for filename in os.listdir():
-        if filename.endswith(".fits"):
-            with fits.open( filename ) as hdul:
-                data = hdul[exten].data
-                hdr  = hdul[exten].header
-                biaslist.append( data )
-
-    mbias = np.median( biaslist, axis=0 )
-    hdu = fits.PrimaryHDU( mbias )
-    hdu.writeto( "mbias.fits", overwrite=True )
-
-
-
-def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob ):
+def EMbiasModel( data, N, mu, sigma, pp, ps, p_EM ):
     """Uses Harpsoe et al. 2012 paper eq. 17 to model the EM output. Get the
     probability of parallel and serial CIC event as an output.
 
@@ -188,17 +169,17 @@ def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob ):
     :type pp: float
     :param ps: Probabilty for serial CIC.
     :type ps: float
-    :param EMprob: EM register single stage probability for impact ionisation.
-    :type EMprob: float
+    :param p_EM: EM register single stage probability for impact ionisation.
+    :type p_EM: float
+    :param stageCount: Number of EM register stages.
+    :type stageCount: int
     :param ignoreSerialCIC: Flag to omit serial CIC.
     :type ignoreSerialCIC: boolean, optional
     :return: Calculated EM output.
     :rtype: List[float]
     """    
-    ignoreSerialCIC=False
-    stageCount = 604 # TODO float(config['detector']['stageCount'])
-    
-    EMgain = calcEMgain( EMprob, stageCount )
+    ignoreSerialCIC=False    
+    EMgain = calcEMgain( p_EM, stageCount )
 
     # Substract bias level since the model will not be correct otherwise
     #data = data - mu
@@ -214,7 +195,7 @@ def EMbiasModel( data, N, mu, sigma, pp, ps, EMprob ):
         #singleStageProbability = EMsingleStageProbability( EMgain, stageCount )
         return N * ( (1 - pp - stageCount*ps) * R
                      + ( pp*pCICpdf( data, EMgain )
-                     + ps*sCICpdf( data, stageCount, EMprob)
+                     + ps*sCICpdf( data, stageCount, p_EM)
                         ) * np.heaviside(data, mu)
                      )
 
@@ -271,7 +252,7 @@ def fitBias( data, bias, readnoise, plotFig=False ):
 
 
 
-def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
+def fitEMBias( data, N, bias, readnoise, pp, ps, p_EM, stageCount, plotFig=False ):
     """Fit full EM output model including readnoise, parallel+serial CIC.
 
     :param data: Input histogram data
@@ -280,14 +261,16 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
     :type N: float
     :param bias: Bias level
     :type bias: float
-    :param readnoise: Readout noise
+    :param readnoise: Readout noise./
     :type readnoise: float
     :param pp: Probability for a parallel CIC event.
     :type pp: float
     :param ps: Probability for a serial CIC event.
     :type ps: float
-    :param EMprob: Single register stage EM gain probability.
-    :type EMprob: float
+    :param p_EM: Single register stage EM gain probability.
+    :type p_EM: float
+    :param stageCount: Number of EM register stages.
+    :type stageCount: int
     :param plotFig: Flag to produce additional graphical output, defaults to False
     :type plotFig: bool, optional
     :return: Returns fitted parameters.
@@ -308,14 +291,14 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
 
     # Let iminuit do the fit
     minuit = Minuit(chi2fit, N=N, mu=bias, sigma=readnoise,
-                    pp=pp, ps=ps, EMprob=EMprob )
+                    pp=pp, ps=ps, p_EM=p_EM )
     minuit.migrad()
 
     # Iterate and correct mistakes in initial bias fit
-    N, bias, ron, pp, ps, EMprob = minuit.values[:]
+    N, bias, ron, pp, ps, p_EM = minuit.values[:]
     centers = centers+bias
     minuit = Minuit(chi2fit, N=N, mu=0, sigma=readnoise,
-                    pp=pp, ps=ps, EMprob=EMprob )
+                    pp=pp, ps=ps, p_EM=p_EM )
     minuit.migrad()
 
 
@@ -330,14 +313,14 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
 
     print("EM bias fitted: "+s1+s2+s3)
 
-    N, bias, ron, pp, ps, EMprob = minuit.values[:]
+    N, bias, ron, pp, ps, p_EM = minuit.values[:]
 
     print("Bias fitted with mean BIAS={:.2f}".format(bias)+
           " and RON={:.2f}".format(ron) )
 
     print("p_pCIC={:.9f}, ".format(pp) + "p_sCIC={:.9f} ".format(ps)
-          + "and EMgain={:.2f}".format(calcEMgain(EMprob, 604)) )
-    print("Corresponding single stage EM gain probability p_m=", EMprob)
+          + "and EMgain={:.2f}".format(calcEMgain(p_EM, stageCount)) )
+    print("Corresponding single stage EM gain probability p_m=", p_EM)
 
     # Produce informative plots if the mode was enabled
     if plotFig:
@@ -350,7 +333,7 @@ def fitEMBias( data, N, bias, readnoise, pp, ps, EMprob, plotFig=False ):
                      drawstyle='steps-mid', capsize=2, label='Data', alpha=0.5)
         ax1.plot(centers, EMbiasModel(centers, *minuit.values[:]),
                  label='Model')
-        ax1.plot(centers, EMbiasModel(centers, N, bias, ron, pp, 0, EMprob),
+        ax1.plot(centers, EMbiasModel(centers, N, bias, ron, pp, 0, p_EM),
                  label='Model, no sCIC')
         ax1.set_yscale('log')
         ax1.legend()
@@ -415,20 +398,21 @@ if __name__ == "__main__":
     # Get initial values from config
     pp = float(config['detector']['p_pCIC'])
     ps = float(config['detector']['p_sCIC'])
-    EMprob = float(config['detector']['p_EM'])
+    p_EM = float(config['detector']['p_EM'])
+    stageCount = int(config['detector']['stagecount'])
     
     # Update bias in config file befire the EM fit, going to be set to 0
     config['detector']['biaslevel'] = str(bias)
 
-    N, bias, ron, pp, ps, EMprob = fitEMBias(data, N, 0, ron, pp, ps, EMprob,
+    N, bias, ron, pp, ps, p_EM = fitEMBias(data, N, 0, ron, pp, ps, p_EM, stageCount,
                                              plotFig=True)
 
     # Update config with new values
     config['detector']['readnoise'] = str(ron)
     config['detector']['p_pcic'] = str(pp)
     config['detector']['p_scic'] = str(ps)
-    config['detector']['p_em'] = str(EMprob)
-    config['detector']['systemgain'] = str(calcEMgain(EMprob, 604))
+    config['detector']['p_em'] = str(p_EM)
+    config['detector']['systemgain'] = str(calcEMgain(p_EM, stageCount))
 
     with open( configfilename, 'w') as configfile:
         config.write( configfile )
