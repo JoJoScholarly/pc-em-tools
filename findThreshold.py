@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import numpy as np
-from sys import argv
 from math import erf
 import configparser
 from fitBackground import calcEMgain
@@ -32,7 +31,7 @@ def falseNegative( thresh, EMgain ):
     :type EMgain: float
     :return: Probability that signal does not raises above threshold.
     :rtype: float
-    """    
+    """
     return 1 - np.e**(-thresh/EMgain)
 
 
@@ -49,9 +48,9 @@ if __name__ == "__main__":
     stageCount = float(config['detector']['stagecount'])
 
     EMgain = calcEMgain(p_EM, stageCount)
-    
+
     p_fp = falsePositive( thresh, ron )
     p_fn = falseNegative( thresh, EMgain )
 
-    print("False positive rate: {:.1f}".format(p_fp*100)+"%")
-    print("False negative rate: {:.1f}".format(p_fn*100)+"%")
+    print("Probability false positive: {:.2f}".format(p_fp*100)+"%")
+    print("Probabiilty false negative: {:.2f}".format(p_fn*100)+"%")

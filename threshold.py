@@ -5,8 +5,8 @@ import numpy as np
 from sys import argv, exit
 from math import erf
 from scipy.stats import binom
-import os
 import configparser
+import glob
 
 from maskCosmic import *
 from fitBackground import *
@@ -28,6 +28,7 @@ p_pCIC = float(config['detector']['p_pCIC'])
 stageCount = float(config['detector']['stagecount'])
 
 
+
 def threshold( data, thresh ):
     """Function takes an image and threshold level as input and returns an array
     with same dimension with values above threshold valued 1 and values below
@@ -45,6 +46,7 @@ def threshold( data, thresh ):
     data[ data>=thresh ] = 1
 
     return data
+
 
 
 def p_lb( lb, thresh, ron, p_EM, stageCount, p_sCIC ):
@@ -68,7 +70,7 @@ def p_lb( lb, thresh, ron, p_EM, stageCount, p_sCIC ):
     EMgain = calcEMgain( p_EM, m )
 
     S = 0
-    for k in range(1, m):
+    for k in np.arange(1, m+1):
         EMgain_k = calcEMgain( p_EM, k )
         S += (1 - np.e**(-thresh/EMgain_k))*np.e**(-lb)
 
@@ -79,7 +81,64 @@ def p_lb( lb, thresh, ron, p_EM, stageCount, p_sCIC ):
     return p_lb
 
 
-def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit ):
+
+def lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC ):
+    # Harpsoe+12 Eq. 25 and 26, sum limit corrected from N-1 to Q
+
+    E = 0
+    V = 0
+
+    corr = N*(1 - erf(thresh/ron/2**0.5) ) / 2 / (N-Q) 
+    lb = -np.log( (N-Q) / N ) - corr
+    p = p_lb(lb, thresh, ron, p_EM, stageCount, p_sCIC)
+
+    for q in np.arange(0, N):
+        lb_q = -np.log((N-q) / N )
+        
+        a = binom.pmf( q, N, p )
+
+        E += lb_q * a
+        V += (lb_q - lb)**2 * a
+    return E, V
+
+
+
+def lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC ):
+    # 1. Calculate all the possible values for E and V
+    #    (N possibilities, less than calculating s)
+    # 2. Look up for pixel value from the LUTs
+
+    # Initialize look-up tabels
+    Q_max = N #int(np.max(Q_2d))
+    lutE = np.zeros(Q_max+1)
+    lutV = np.zeros(Q_max+1)
+
+    print("Calculating Look-Up Tables for possible E(lb) and Var(lb) values")
+
+    # Calculate all possible values for E(lb) and Var(lb) given the frame count
+    for Q in np.arange(0, Q_max+1):
+        E, V = lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC )
+        lutE[Q] = E
+        lutV[Q] = V
+
+    print("LUTs ready.")
+
+    # Initialize output arrays
+    lb_E = np.zeros(Q_2d.shape)
+    lb_V = np.zeros(Q_2d.shape)
+
+    # Fill in the 2D array with by drawing LUT values with corresponding index
+    for j in np.arange(Q_2d.shape[0]):
+        for k in np.arange(Q_2d.shape[1]):
+            Q = int(Q_2d[j,k])
+            lb_E[j,k] = lutE[Q]
+            lb_V[j,k] = lutV[Q]
+
+    return lb_E, lb_V
+
+
+
+def poissonRateParameter1( filepath, thresh, bias, ron, crLimit ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -87,9 +146,10 @@ def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, cr
     exten = 0
     N = 0
 
-    for filename in os.listdir( filepath ):
+    #for filename in os.listdir( filepath ):
+    for filename in glob.iglob( filepath + '**/**', recursive=True):
         if filename.endswith(".fits"):
-            with fits.open( filepath + filename ) as hdul:
+            with fits.open( filename ) as hdul:
                 data = hdul[exten].data
             if N == 0:
                 cosmics = np.zeros(data.shape)
@@ -107,7 +167,7 @@ def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, cr
             overscan = data[:,1050:]
             overscan = overscan.reshape(overscan.shape[0]*overscan.shape[1])
 
-            binMin = 0; binMax = 2000
+            binMin = 0; binMax = 9000
             bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
             counts, binsOut = np.histogram(overscan, bins=bins)
 
@@ -131,7 +191,7 @@ def poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, cr
 
 
 
-def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit ):
+def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -139,9 +199,10 @@ def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, cr
     exten = 0
     N = 0
 
-    for filename in os.listdir( filepath ):
+    #for filename in os.listdir( filepath ):
+    for filename in glob.iglob( filepath + '**/*.fits', recursive=True):
         if filename.endswith(".fits"):
-            with fits.open( filepath + filename ) as hdul:
+            with fits.open( filename ) as hdul:
                 data = hdul[exten].data
             if N == 0:
                 cosmics = np.zeros(data.shape)
@@ -159,7 +220,7 @@ def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, cr
             overscan = data[:,1050:]
             overscan = overscan.reshape(overscan.shape[0]*overscan.shape[1])
 
-            binMin = 0; binMax = 2000
+            binMin = 0; binMax = 9000
             bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
             counts, binsOut = np.histogram(overscan, bins=bins)
 
@@ -187,59 +248,6 @@ def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, cr
 
 
 
-def lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC ):
-    # 1. Calculate all the possible values for E and V
-    #    (N possibilities, less than calculating s)
-    # 2. Look up for pixel value from the LUTs
-
-    # Initialize look-up tabels
-    lutE = []; lutV = []
-
-    print("Calculating possible values for E(lb) and Var(lb)")
-
-    # Calculate all possible values for E(lb) and Var(lb) given the frame count
-    for Q in np.arange(N+1):
-        E, V = lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC )
-        lutE.append(E)
-        lutV.append(V)
-
-    print("LUTs ready.")
-    print(len(lutE), len(lutV))
-
-    # Initialize output arrays
-    lb_E = np.zeros(Q_2d.shape)
-    lb_V = np.zeros(Q_2d.shape)
-
-    # Fill in pre-calculated values drawing value the corresponding index of
-    # the look-up tables
-    for j in range(Q_2d.shape[0]):
-        for k in range(Q_2d.shape[1]):
-            Q = int(Q_2d[j,k])
-            lb_E[j,k] = lutE[Q]
-            lb_V[j,k] = lutV[Q]
-
-    return lb_E, lb_V
-
-
-
-def lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC ):
-    E = 0
-    V = 0
-
-    lb = -np.log( (N-Q) / N )
-
-    for q in range(0, Q):
-        lb_q = -np.log((N-q) / N )
-
-        p = p_lb(lb_q, thresh, ron, p_EM, stageCount, p_sCIC)
-        a = binom.pmf( q, N, p )
-
-        E += lb_q * a
-        V += (lb_q - lb)**2 * a
-    return E, V
-
-
-
 if __name__ == "__main__":
     filepath = argv[1]
 
@@ -258,18 +266,10 @@ if __name__ == "__main__":
     crLimit = float(config['pc']['crlimit'])
 
     # Get the rate parameter estimate and variance
-    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit )
+    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit )
 
     # Sanity check Poisson direct Poisson rate without corrections
-    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, p_EM, p_sCIC, p_pCIC, crLimit )
-
-    """
-    # For a sanity check
-    img_lb = poissonRateParameter1( filepath )
-    outfile0 =  filepath + "lambda.fits"
-    hdu1 = fits.PrimaryHDU( img_lb )
-    hdu1.writeto( outfile0, overwrite=True )
-    """
+    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, crLimit )
 
     # Write to file
     outfile1 = filepath + "lambda_E.fits"
