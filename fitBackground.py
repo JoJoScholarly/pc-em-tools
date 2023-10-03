@@ -8,14 +8,10 @@ are according to Harpsoe et al. (2012) paper Bayesian Photon Counting with EMCCD
 
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy.io import fits
 from iminuit import Minuit
-from scipy.stats import norm, poisson, chi2
-from scipy.special import gamma
+from scipy.stats import norm, chi2
 import configparser
-import os
 import sys
-
 
 from iminuit.util import make_func_code
 from iminuit import describe #, Minuit,
@@ -25,6 +21,7 @@ configfilename = 'pc-tools.cfg'
 config = configparser.ConfigParser()
 config.read( configfilename )
 stageCount = int(config['detector']['stagecount'])
+
 
 def set_var_if_None(var, x):
     if var is not None:
@@ -40,7 +37,7 @@ def compute_f(f, x, *par):
         return np.array([f(xi, *par) for xi in x])
 
 
-class Chi2Regression:  # override the class with a better one
+class Chi2Regression: 
     def __init__(self, f, x, y, sy=None, weights=None, bound=None):
         if bound is not None:
             x = np.array(x)
@@ -51,7 +48,7 @@ class Chi2Regression:  # override the class with a better one
             y  = y[mask]
             sy = sy[mask]
 
-        self.f = f  # model predicts y for given x
+        self.f = f
         self.x = np.array(x)
         self.y = np.array(y)
         
@@ -243,7 +240,7 @@ def fitBias( data, bias, readnoise, plotFig=False ):
         plt.step(centers, counts, where='mid')
         plt.plot(centers, gaussian(centers, *minuit.values[:]))
         plt.yscale('log')
-        plt.ylim((10, 1e3))
+        plt.ylim((10, 2e3))
         plt.xlim((0,200))
         plt.show()
 
@@ -374,7 +371,7 @@ if __name__ == "__main__":
     
     # Clip values making the fits worse
     # TODO necessary or better way to do? Crop overscans out?
-    data = data[80:3000] 
+    #data = data[0:9000] 
     
     # TODO Pre-amp gain here? Electron conversion needed or not?
     #data[:,1] = data[:,1]
