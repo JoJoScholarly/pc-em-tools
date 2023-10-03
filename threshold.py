@@ -88,12 +88,13 @@ def lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC ):
     E = 0
     V = 0
 
-    lb = -np.log( (N-Q) / N )
+    corr = N*(1 - erf(thresh/ron/2**0.5) ) / 2 / (N-Q) 
+    lb = -np.log( (N-Q) / N ) - corr
+    p = p_lb(lb, thresh, ron, p_EM, stageCount, p_sCIC)
 
-    for q in np.arange(0, Q+1):
+    for q in np.arange(0, N):
         lb_q = -np.log((N-q) / N )
-
-        p = p_lb(lb_q, thresh, ron, p_EM, stageCount, p_sCIC)
+        
         a = binom.pmf( q, N, p )
 
         E += lb_q * a
@@ -108,7 +109,7 @@ def lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC ):
     # 2. Look up for pixel value from the LUTs
 
     # Initialize look-up tabels
-    Q_max = int(np.max(Q_2d))
+    Q_max = N #int(np.max(Q_2d))
     lutE = np.zeros(Q_max+1)
     lutV = np.zeros(Q_max+1)
 
@@ -166,7 +167,7 @@ def poissonRateParameter1( filepath, thresh, bias, ron, crLimit ):
             overscan = data[:,1050:]
             overscan = overscan.reshape(overscan.shape[0]*overscan.shape[1])
 
-            binMin = 0; binMax = 2000
+            binMin = 0; binMax = 9000
             bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
             counts, binsOut = np.histogram(overscan, bins=bins)
 
@@ -219,7 +220,7 @@ def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit ):
             overscan = data[:,1050:]
             overscan = overscan.reshape(overscan.shape[0]*overscan.shape[1])
 
-            binMin = 0; binMax = 5000
+            binMin = 0; binMax = 9000
             bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
             counts, binsOut = np.histogram(overscan, bins=bins)
 
