@@ -2,7 +2,7 @@
 
 import astropy.io.fits as fits
 import numpy as np
-from sys import argv, exit
+from sys import argv
 from math import erf
 from scipy.stats import binom
 import configparser
@@ -83,18 +83,21 @@ def p_lb( lb, thresh, ron, p_EM, stageCount, p_sCIC ):
 
 
 def lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC ):
-    # Harpsoe+12 Eq. 25 and 26, sum limit corrected from N-1 to Q
-
+    # Harpsoe+12 Eq. 25 and 26
     E = 0
     V = 0
 
+    # Correction term for overestimation by RON raising above threshold
+    # Affects only low gains
     corr = N*(1 - erf(thresh/ron/2**0.5) ) / 2 / (N-Q) 
+
+    # Estimate lambda and probability for lambda
     lb = -np.log( (N-Q) / N ) - corr
     p = p_lb(lb, thresh, ron, p_EM, stageCount, p_sCIC)
 
+    # Calculate best estimator and variance
     for q in np.arange(0, N):
         lb_q = -np.log((N-q) / N )
-        
         a = binom.pmf( q, N, p )
 
         E += lb_q * a
@@ -109,14 +112,13 @@ def lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC ):
     # 2. Look up for pixel value from the LUTs
 
     # Initialize look-up tabels
-    Q_max = N #int(np.max(Q_2d))
-    lutE = np.zeros(Q_max+1)
-    lutV = np.zeros(Q_max+1)
+    lutE = np.zeros(N)
+    lutV = np.zeros(N)
 
     print("Calculating Look-Up Tables for possible E(lb) and Var(lb) values")
 
     # Calculate all possible values for E(lb) and Var(lb) given the frame count
-    for Q in np.arange(0, Q_max+1):
+    for Q in np.arange(0, N):
         E, V = lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC )
         lutE[Q] = E
         lutV[Q] = V
@@ -138,60 +140,7 @@ def lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC ):
 
 
 
-def poissonRateParameter1( filepath, thresh, bias, ron, crLimit ):
-    # Do thresholding for images
-    # Detect cosmic rays as removal
-    cosmics = None
-    detections = None
-    exten = 0
-    N = 0
-
-    #for filename in os.listdir( filepath ):
-    for filename in glob.iglob( filepath + '**/**', recursive=True):
-        if filename.endswith(".fits"):
-            with fits.open( filename ) as hdul:
-                data = hdul[exten].data
-            if N == 0:
-                cosmics = np.zeros(data.shape)
-                detections = np.zeros(data.shape)
-
-            # Each cosmic ray gives negative count, i.e. missed frame
-            cm = maskCosmicEM( data, crLimit )
-            cosmics += cm
-
-            # Each (photo) electron counts as positive, cosmics masked
-            mask = np.array(cm, dtype=bool)
-
-            # TODO not universal
-            # Take a region from top of frame with little or no light on it
-            overscan = data[:,1050:]
-            overscan = overscan.reshape(overscan.shape[0]*overscan.shape[1])
-
-            binMin = 0; binMax = 9000
-            bins = np.linspace(binMin, binMax, int(binMax)-int(binMin) + 1)
-            counts, binsOut = np.histogram(overscan, bins=bins)
-
-            overscanHist = np.vstack([counts, binsOut[1:]]).T
-
-            Norm, bias, ron = fitBias( overscanHist, bias=bias, readnoise=ron, plotFig=False )
-
-            # Round fitted bias level to closest integer value
-            thresholdLevel = round(bias + thresh)
-
-            aboveThreshold = threshold( data, thresh=thresholdLevel )
-            aboveThreshold[mask] = 0
-            detections += aboveThreshold
-
-            # Number of frames up
-            N += 1
-
-    Q = detections #+ cosmics
-
-    return -np.log((N-Q) / N ), cosmics/N
-
-
-
-def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit ):
+def determinePoissonRate( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit ):
     # Do thresholding for images
     # Detect cosmic rays as removal
     cosmics = None
@@ -240,7 +189,7 @@ def poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit ):
     print("Frames read in: ", N)
 
     # Take the detection rates and calculate lambda estimate
-    Q_2d = detections #+ cosmics
+    Q_2d = detections
     lb_E, lb_V = lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC )
     eff = (N-cosmics)/N
 
@@ -265,17 +214,13 @@ if __name__ == "__main__":
     stageCount = int(config['detector']['stagecount'])
     crLimit = float(config['pc']['crlimit'])
 
-    # Get the rate parameter estimate and variance
-    img_E, img_V, eff = poissonRateParameter2( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit )
-
-    # Sanity check Poisson direct Poisson rate without corrections
-    img_lb, img_CR = poissonRateParameter1( filepath, thresh, bias, ron, crLimit )
+    # Get the rate parameter estimate, variance and CR efficiency
+    img_E, img_V, eff = determinePoissonRate( filepath, thresh, bias, ron, p_EM, p_sCIC, crLimit )
 
     # Write to file
     outfile1 = filepath + "lambda_E.fits"
     outfile2 = filepath + "lambda_Var.fits"
     outfile3 = filepath + "CR_eff.fits"
-    outfile4 = filepath + "lambda_lb.fits"
 
     hdu1 = fits.PrimaryHDU( img_E )
     hdu1.writeto( outfile1, overwrite=True )
@@ -285,6 +230,3 @@ if __name__ == "__main__":
 
     hdu3 = fits.PrimaryHDU( eff )
     hdu3.writeto( outfile3, overwrite=True )
-
-    hdu4 = fits.PrimaryHDU( img_lb )
-    hdu4.writeto( outfile4, overwrite=True )
