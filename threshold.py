@@ -118,7 +118,7 @@ def lbEstVar2d( N, Q_2d, thresh, ron, p_EM, p_sCIC ):
     print("Calculating Look-Up Tables for possible E(lb) and Var(lb) values")
 
     # Calculate all possible values for E(lb) and Var(lb) given the frame count
-    for Q in np.arange(0, N):
+    for Q in np.arange(0, N-1):
         E, V = lbEstVar( N, Q, thresh, ron, p_EM, p_sCIC )
         lutE[Q] = E
         lutV[Q] = V
